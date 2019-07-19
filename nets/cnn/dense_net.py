@@ -70,12 +70,15 @@ class DenseNet(object):
                                 outputs_collections=end_points_collection):
                 with tf.variable_scope("conv_1"):
                     net = slim.conv2d(inputs, self.params.first_output_features, [3, 3])
+                    print('inputs: ', inputs.shape)
+                    print('conv1: ', net.shape)
 
                 with tf.variable_scope('dense_block_1'):
                     # add se block
                     # net = squeeze_excitation_layer(net, num_channels, ratio=16, layer_name='dense_block_1')
 
                     net, num_channels = self.dense_block(net, num_channels)
+                    print('denseblock1:', net.shape)
 
                 with tf.variable_scope('transition_1'):
                     # add se block
@@ -104,13 +107,15 @@ class DenseNet(object):
                     # net = squeeze_excitation_layer(net, num_channels, ratio=16, layer_name='dense_block_3')
 
                     net, num_channels = self.dense_block(net, num_channels)
+                    print(net.shape)
                     
                 with tf.variable_scope('transition_3'):
                     # add se block
                     # net = squeeze_excitation_layer(net, num_channels, ratio=16, layer_name='transition_3')
 
                     # feature map size: 8*64 -> 4*64
-                    net, num_channels = self.transition_layer(net, num_channels, pool_stride=[2, 1])
+                    net, num_channels = self.transition_layer(net, num_channels, pool_stride=[2, 2])
+                    print(net.shape)
 
                 # with tf.variable_scope('global_average_pooling'):
                 #     # net = slim.fully_connected(net, num_channels)
@@ -136,6 +141,7 @@ class DenseNet(object):
 
     def dense_block(self, inputs, num_channels):
         net = slim.repeat(inputs, self.params.layers_per_block, self.block_inner_layer)
+        print('dense_block: ', net.shape)
         num_channels += self.params.growth_rate * self.params.layers_per_block
         return net, num_channels
 
@@ -163,9 +169,12 @@ class DenseNet(object):
     def bottleneck(self, inputs):
         with tf.variable_scope("bottleneck"):
             num_channels = self.params.growth_rate * 4
-            # output = slim.batch_norm(inputs)
-            # output = tf.nn.relu(output)
-            output = slim.conv2d(inputs, num_channels, [1, 1], padding='VALID', activation_fn=None)
+            output = slim.batch_norm(inputs)
+            print('bottleneck_bn: ', output.shape)
+            output = tf.nn.relu(output)
+            # output = slim.conv2d(inputs, num_channels, [1, 1], padding='VALID', activation_fn=None)
+            output = slim.conv2d(output, num_channels, [1, 1], padding='VALID', activation_fn=None)
+
             output = self.dropout(output)
         return output
 
@@ -180,9 +189,11 @@ class DenseNet(object):
         - dropout, if required
         """
         with tf.variable_scope("composite_function"):
-            # output = slim.batch_norm(inputs)
-            # output = tf.nn.relu(output)
-            output = slim.conv2d(inputs, num_channels, kernel_size, activation_fn=None)
+            output = slim.batch_norm(inputs)
+            output = tf.nn.relu(output)
+            # output = slim.conv2d(inputs, num_channels, kernel_size, activation_fn=None)
+            output = slim.conv2d(output, num_channels, kernel_size, activation_fn=None)
+
             output = self.dropout(output)
         return output
 
@@ -201,9 +212,6 @@ class DenseNet(object):
 
         with slim.arg_scope(
                 [slim.conv2d],
-                normalizer_fn = slim.batch_norm,
-                activation_fn = tf.nn.relu,
-                normalizer_params=batch_norm_params,
                 weights_regularizer=slim.l2_regularizer(weight_decay),
                 weights_initializer=slim.variance_scaling_initializer()):
             with slim.arg_scope([slim.batch_norm], **batch_norm_params) as arg_sc:

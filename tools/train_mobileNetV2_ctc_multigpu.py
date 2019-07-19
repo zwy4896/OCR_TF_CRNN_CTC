@@ -30,12 +30,12 @@ from tfrecord import TFRecord_Reader
 tf.app.flags.DEFINE_string(
     'data_dir', '/datacentre/huan.wang/densenet_ctc_synth300w_tfrecords', 'Path to the directory containing data tf record.')
 
-tf.app.flags.DEFINE_boolean('restore', False, 'whether to resotre from checkpoint')   
+tf.app.flags.DEFINE_boolean('restore', True, 'whether to resotre from checkpoint')   
 
-tf.app.flags.DEFINE_string('gpu_list', '0,1,2,3', '')
+tf.app.flags.DEFINE_string('gpu_list', '2,3', '')
 
 tf.app.flags.DEFINE_string(
-    'model_dir', 'MobileNetV2_ckpt_20190715/', 'Base directory for the model.')
+    'model_dir', 'MobileNetV2_ckpt_20190719/', 'Base directory for the model.')
 
 tf.app.flags.DEFINE_integer(
     'num_threads', 1, 'The number of threads to use in batch shuffling') 
@@ -45,7 +45,7 @@ tf.app.flags.DEFINE_integer(
 
 # ------------------------------------Basic prameters------------------------------------
 tf.app.flags.DEFINE_integer(
-    'batch_size', 256, 'The number of samples in each batch.')
+    'batch_size', 64, 'The number of samples in each batch.')
 
 tf.app.flags.DEFINE_integer(
     'max_train_steps', 200000, 'The number of maximum iteration steps for training')
@@ -173,8 +173,8 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
         #    tf.reshape(input_labels_lengths, [-1]), tf.reshape(input_sequence_lengths, [-1])))
         total_loss = tf.add_n([ctc_loss] + tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
     '''
-    with tf.variable_scope('DENSENET_CTC', reuse=reuse_variables):
-        net = DenseNet(input_images, is_training=True)
+    with tf.variable_scope('MobilenetV2', reuse=reuse_variables):
+        net = MobileNetV2(input_images, is_training=True)
 
         cnn_out = net.net
         cnn_output_shape = tf.shape(cnn_out)
@@ -193,23 +193,7 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
 
         cnn_shape = cnn_out.get_shape().as_list()
         cnn_out_reshaped.set_shape([None, cnn_shape[2], cnn_shape[1] * cnn_shape[3]])
-        # logits = tf.layers.dense(cnn_out_reshaped, 5990, kernel_initializer = tf.contrib.layers.xavier_initializer())
         logits = slim.fully_connected(cnn_out_reshaped, 5990, activation_fn = None)
-        # cnn_out_reshaped = tf.expand_dims(cnn_out_reshaped, axis=1)
-        # logits = slim.conv2d(cnn_out_reshaped, 5990, [1,1],activation_fn=None, normalizer_fn = None)
-        # logits = tf.squeeze(logits,axis=1)
-        print(logits.shape)
-
-        # bilstm = cnn_out_reshaped
-        # for i in range(2):
-        #     with tf.variable_scope('bilstm_%d' % (i + 1)):
-        #         if i == 1:
-        #             bilstm = _bidirectional_LSTM(bilstm, 5990, seq_len)
-        #         else:
-        #             bilstm = _bidirectional_LSTM(bilstm, 256, seq_len)
-        # logits = bilstm
-
-        # logits = slim.fully_connected(cnn_out_reshaped, 5990, biases_initializer = None, activation_fn=None)
 
         # ctc require time major
         logits = tf.transpose(logits, (1, 0, 2))
@@ -230,9 +214,10 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
 
 def _train_densenetocr_ctc():
     # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'train32_768_20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'train.tfrecord'), os.path.join(FLAGS.data_dir, 'train_02.tfrecord'), os.path.join(FLAGS.data_dir, 'validation.tfrecord')]
-    tfrecord_path = [os.path.join(FLAGS.data_dir, 'train.tfrecord')]
-    # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train32_768_20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'trainhehe_20190707.tfrecord')]
-    # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train.tfrecord')]
+    tfrecord_path = ['/datacentre/wuyang.zhang/300w_tfrecords_32_512_sin_blur_20190703/train.tfrecord']
+    tfrecord_path.append(os.path.join(FLAGS.data_dir, 'train.tfrecord'))
+    tfrecord_path.append('/datacentre/wuyang.zhang/real_tfrecords_20190712/train_32_280_20190712.tfrecord')
+    tfrecord_path.append('/datacentre/wuyang.zhang/real_imgs_tfrecord_32_280_512_20190704/train_real_32_280_512.tfrecord')
 
     tfrecord_reader = TFRecord_Reader(tfrecord_path, batch_size=FLAGS.batch_size)
     batch_images, batch_labels, batch_labels_dense, batch_input_labels_lengths, batch_sequence_lengths, _ = tfrecord_reader.read_and_decode()

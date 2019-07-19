@@ -158,8 +158,8 @@ def _inference_densenet_ctc():
                 net, _ = densenet.densenet_40(input_image, 5990, first_output_features, layers_per_block, growth_rate, is_training = False)
     '''
 
-    with tf.variable_scope('DENSENET_CTC', reuse=False):
-        net = DenseNet(input_image, is_training=False)
+    with tf.variable_scope('MobilenetV2', reuse=False):
+        net = MobileNetV2(input_image, is_training=False)
         cnn_out = net.net
 
         cnn_output_shape = tf.shape(cnn_out)

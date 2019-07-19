@@ -8,10 +8,11 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 import os
-
-PAD_TO = 280
-TEXT_PAD_TO = 10
-TEXT_PAD_VAL = 5990
+# 真实样本 280宽度最长26个字符
+# 真实样本 512宽度最长44个字符
+PAD_TO = 512
+TEXT_PAD_TO = 44
+TEXT_PAD_VAL = 5989
 
 class TFRecord_Reader(object):
 

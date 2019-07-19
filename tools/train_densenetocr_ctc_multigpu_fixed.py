@@ -17,8 +17,7 @@ import numpy as np
 from nets import densenet
 from nets.cnn.dense_net import DenseNet
 from nets.cnn.paper_cnn import PaperCNN
-from nets.cnn.mobile_net_v2 import MobileNetV2
-import keys_old as keys    # keys.py为6049字符，keys_old中为5990个字符
+import keys
 #import warpctc_tensorflow
 from tfrecord import TFRecord_Reader
 
@@ -30,25 +29,25 @@ from tfrecord import TFRecord_Reader
 tf.app.flags.DEFINE_string(
     'data_dir', '/datacentre/huan.wang/densenet_ctc_synth300w_tfrecords', 'Path to the directory containing data tf record.')
 
-tf.app.flags.DEFINE_boolean('restore', False, 'whether to resotre from checkpoint')   
+tf.app.flags.DEFINE_boolean('restore', True, 'whether to resotre from checkpoint')   
 
-tf.app.flags.DEFINE_string('gpu_list', '0,1,2,3', '')
+tf.app.flags.DEFINE_string('gpu_list', '1', '')
 
 tf.app.flags.DEFINE_string(
-    'model_dir', 'MobileNetV2_ckpt_20190715/', 'Base directory for the model.')
+    'model_dir', 'multigpu_ckpt_32_280_20190713/', 'Base directory for the model.')
 
 tf.app.flags.DEFINE_integer(
-    'num_threads', 1, 'The number of threads to use in batch shuffling') 
+    'num_threads', 8, 'The number of threads to use in batch shuffling')
 
 tf.app.flags.DEFINE_integer(
     'step_per_save', 1000, 'The number of training steps to run between save checkpoints.')
 
 # ------------------------------------Basic prameters------------------------------------
 tf.app.flags.DEFINE_integer(
-    'batch_size', 256, 'The number of samples in each batch.')
+    'batch_size', 96, 'The number of samples in each batch.')    #96 max
 
 tf.app.flags.DEFINE_integer(
-    'max_train_steps', 200000, 'The number of maximum iteration steps for training')
+    'max_train_steps', 2000000, 'The number of maximum iteration steps for training')
 
 tf.app.flags.DEFINE_float(
     'learning_rate', 0.0005, 'The initial learning rate for training.') #0.0005
@@ -164,7 +163,7 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
             first_output_features = 64
             layers_per_block = 8
             growth_rate = 8
-            net, _ = densenet.densenet_40(input_images, 5990, first_output_features, layers_per_block, growth_rate, is_training = True)
+            net, _ = densenet.densenet_40(input_images, 5990, first_output_features, layers_per_block, growth_rate, bc_mode = True, is_training = True)
             
         ctc_loss = tf.reduce_mean(
             tf.nn.ctc_loss(labels=input_labels, inputs=net, sequence_length=input_sequence_lengths,
@@ -172,6 +171,11 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
         #ctc_loss = tf.reduce_mean(warpctc_tensorflow.ctc(net, tf.reshape(input_labels_dense, [-1]), \
         #    tf.reshape(input_labels_lengths, [-1]), tf.reshape(input_sequence_lengths, [-1])))
         total_loss = tf.add_n([ctc_loss] + tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+
+        # add summary
+        if reuse_variables is None:
+            tf.summary.scalar(name='CTC_Loss', tensor=ctc_loss)
+            tf.summary.scalar(name='TOTAL_Loss', tensor=total_loss)
     '''
     with tf.variable_scope('DENSENET_CTC', reuse=reuse_variables):
         net = DenseNet(input_images, is_training=True)
@@ -193,23 +197,19 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
 
         cnn_shape = cnn_out.get_shape().as_list()
         cnn_out_reshaped.set_shape([None, cnn_shape[2], cnn_shape[1] * cnn_shape[3]])
-        # logits = tf.layers.dense(cnn_out_reshaped, 5990, kernel_initializer = tf.contrib.layers.xavier_initializer())
-        logits = slim.fully_connected(cnn_out_reshaped, 5990, activation_fn = None)
-        # cnn_out_reshaped = tf.expand_dims(cnn_out_reshaped, axis=1)
-        # logits = slim.conv2d(cnn_out_reshaped, 5990, [1,1],activation_fn=None, normalizer_fn = None)
-        # logits = tf.squeeze(logits,axis=1)
-        print(logits.shape)
-
-        # bilstm = cnn_out_reshaped
-        # for i in range(2):
-        #     with tf.variable_scope('bilstm_%d' % (i + 1)):
-        #         if i == 1:
-        #             bilstm = _bidirectional_LSTM(bilstm, 5990, seq_len)
-        #         else:
-        #             bilstm = _bidirectional_LSTM(bilstm, 256, seq_len)
-        # logits = bilstm
-
-        # logits = slim.fully_connected(cnn_out_reshaped, 5990, biases_initializer = None, activation_fn=None)
+        
+        '''
+        bilstm = cnn_out_reshaped
+        for i in range(2):
+            with tf.variable_scope('bilstm_%d' % (i + 1)):
+                if i == 1:
+                    bilstm = _bidirectional_LSTM(bilstm, 5990, seq_len)
+                else:
+                    bilstm = _bidirectional_LSTM(bilstm, 256, seq_len)
+        logits = bilstm
+        '''
+        #logits = slim.fully_connected(cnn_out_reshaped, 5990, activation_fn=None)
+        logits = tf.layers.dense(cnn_out_reshaped, 5990, kernel_initializer = tf.contrib.layers.xavier_initializer())
 
         # ctc require time major
         logits = tf.transpose(logits, (1, 0, 2))
@@ -220,7 +220,7 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
         #ctc_loss = tf.reduce_mean(warpctc_tensorflow.ctc(net, tf.reshape(input_labels_dense, [-1]), \
         #    tf.reshape(input_labels_lengths, [-1]), tf.reshape(input_sequence_lengths, [-1])))
         total_loss = tf.add_n([ctc_loss] + tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-
+        
         # add summary
         if reuse_variables is None:
             tf.summary.scalar(name='CTC_Loss', tensor=ctc_loss)
@@ -229,10 +229,9 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
     return total_loss, ctc_loss
 
 def _train_densenetocr_ctc():
-    # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'train32_768_20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'train.tfrecord'), os.path.join(FLAGS.data_dir, 'train_02.tfrecord'), os.path.join(FLAGS.data_dir, 'validation.tfrecord')]
-    tfrecord_path = [os.path.join(FLAGS.data_dir, 'train.tfrecord')]
-    # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train32_768_20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'trainhehe_20190707.tfrecord')]
-    # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train.tfrecord')]
+    tfrecord_path = [ os.path.join(FLAGS.data_dir, 'train.tfrecord') ]
+    tfrecord_path.append('/datacentre/wuyang.zhang/real_tfrecords_20190712/train_32_280_20190712.tfrecord' )
+    #char_map_dict = json.load(open(FLAGS.char_map_json_file, 'r'))
 
     tfrecord_reader = TFRecord_Reader(tfrecord_path, batch_size=FLAGS.batch_size)
     batch_images, batch_labels, batch_labels_dense, batch_input_labels_lengths, batch_sequence_lengths, _ = tfrecord_reader.read_and_decode()
@@ -240,7 +239,7 @@ def _train_densenetocr_ctc():
     global_step = tf.train.create_global_step()
     learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, FLAGS.decay_steps, FLAGS.decay_rate, staircase=True)
 
-    # optimizer = tf.train.AdadeltaOptimizer(learning_rate=learning_rate)
+    #optimizer = tf.train.AdadeltaOptimizer(learning_rate=learning_rate)
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     #optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9)
 
@@ -257,7 +256,8 @@ def _train_densenetocr_ctc():
     tf.ConfigProto(allow_soft_placement=True)
     for i, gpu_id in enumerate(gpus):
         with tf.device('/gpu:%d' % gpu_id):
-            with tf.name_scope('model_%d' % gpu_id) as scope:
+            #with tf.name_scope('model_%d' % gpu_id) as scope:
+            if 1:
                 iis = input_images_split[i]
                 ilms = input_labels_split[i]
                 ildms = input_labels_dense_split[i]
@@ -265,7 +265,7 @@ def _train_densenetocr_ctc():
                 iisms = input_sequence_lengths_split[i]
                 total_loss, ctc_loss = \
                     tower_loss(iis, ilms, ildms, ilsms, iisms, reuse_variables)
-                batch_norm_updates_op = tf.group(*tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope))
+                batch_norm_updates_op = tf.group(*tf.get_collection(tf.GraphKeys.UPDATE_OPS))
                 reuse_variables = True
 
                 grads = optimizer.compute_gradients(total_loss)
@@ -283,13 +283,18 @@ def _train_densenetocr_ctc():
     with tf.control_dependencies([variables_averages_op, apply_gradient_op, batch_norm_updates_op]):
         train_op = tf.no_op(name='train_op')
 
-    saver = tf.train.Saver(tf.global_variables())
+    var_list = tf.trainable_variables()
+    g_list = tf.global_variables()
+    bn_moving_vars = [g for g in g_list if 'moving_mean' in g.name]
+    bn_moving_vars += [g for g in g_list if 'moving_variance' in g.name]
+    var_list += bn_moving_vars
+    saver = tf.train.Saver(var_list=var_list)
+
     summary_writer = tf.summary.FileWriter(FLAGS.model_dir, tf.get_default_graph())
 
     init_op = tf.global_variables_initializer()
 
     # set checkpoint saver
-    saver = tf.train.Saver()
     if not os.path.exists(FLAGS.model_dir):
         os.makedirs(FLAGS.model_dir)
     train_start_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
@@ -308,10 +313,10 @@ def _train_densenetocr_ctc():
         if FLAGS.restore:
             print('continue training from previous checkpoint')
             ckpt = tf.train.latest_checkpoint(FLAGS.model_dir)
-            variable_restore_op = slim.assign_from_checkpoint_fn(ckpt, slim.get_trainable_variables(),
-                                                             ignore_missing_vars=True)
-            #saver.restore(sess, ckpt)
-            variable_restore_op(sess)
+            #variable_restore_op = slim.assign_from_checkpoint_fn(ckpt, slim.get_trainable_variables(),
+            #                                                 ignore_missing_vars=True)
+            saver.restore(sess, ckpt)
+            #variable_restore_op(sess)
 
         for step in range(FLAGS.max_train_steps):
             

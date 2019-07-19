@@ -15,7 +15,7 @@ import tensorflow as tf
 
 import cv2
 import numpy as np
-import keys
+import keys_old as keys
 #sys.path.append(os.getcwd()+'/tools')
 
 _IMAGE_HEIGHT = 32
@@ -85,7 +85,7 @@ def _write_tfrecord(dataset_split, anno_lines):
     if not os.path.exists(FLAGS.data_dir):
         os.makedirs(FLAGS.data_dir)
 
-    tfrecords_path = os.path.join(FLAGS.data_dir, dataset_split + '.tfrecord')
+    tfrecords_path = os.path.join(FLAGS.data_dir, dataset_split + '_32_280_20190712' + '.tfrecord')
     with tf.python_io.TFRecordWriter(tfrecords_path) as writer:
         for i, line in enumerate(anno_lines):
             line = line.strip()
