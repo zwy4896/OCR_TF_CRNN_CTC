@@ -18,7 +18,7 @@ from nets import densenet
 from nets.cnn.dense_net import DenseNet
 from nets.cnn.paper_cnn import PaperCNN
 from nets.cnn.mobile_net_v2 import MobileNetV2
-import keys_old as keys    # keys.py为6049字符，keys_old中为5990个字符
+import keys as keys    # keys.py为6049字符，keys_old中为5990个字符
 #import warpctc_tensorflow
 from tfrecord import TFRecord_Reader
 
@@ -28,30 +28,30 @@ from tfrecord import TFRecord_Reader
 #tf.app.flags.DEFINE_string(
 #    'data_dir', '../densenet_ctc_synth300w_tfrecords/', 'Path to the directory containing data tf record.')
 tf.app.flags.DEFINE_string(
-    'data_dir', '/datacentre/huan.wang/densenet_ctc_synth300w_tfrecords', 'Path to the directory containing data tf record.')
+    'data_dir', './mnv2_densenet_tfrecord', 'Path to the directory containing data tf record.')
 
-tf.app.flags.DEFINE_boolean('restore', True, 'whether to resotre from checkpoint')   
+tf.app.flags.DEFINE_boolean('restore', False, 'whether to resotre from checkpoint')
 
-tf.app.flags.DEFINE_string('gpu_list', '2,3', '')
+tf.app.flags.DEFINE_string('gpu_list', '0, 1', '')
 
 tf.app.flags.DEFINE_string(
-    'model_dir', 'MobileNetV2_ckpt_20190719/', 'Base directory for the model.')
+    'model_dir', 'MobileNetV2_ckpt_20190917/', 'Base directory for the model.')
 
 tf.app.flags.DEFINE_integer(
-    'num_threads', 1, 'The number of threads to use in batch shuffling') 
+    'num_threads', 1, 'The number of threads to use in batch shuffling')
 
 tf.app.flags.DEFINE_integer(
     'step_per_save', 1000, 'The number of training steps to run between save checkpoints.')
 
 # ------------------------------------Basic prameters------------------------------------
 tf.app.flags.DEFINE_integer(
-    'batch_size', 64, 'The number of samples in each batch.')
+    'batch_size', 32, 'The number of samples in each batch.')
 
 tf.app.flags.DEFINE_integer(
-    'max_train_steps', 200000, 'The number of maximum iteration steps for training')
+    'max_train_steps', 2000000, 'The number of maximum iteration steps for training')
 
 tf.app.flags.DEFINE_float(
-    'learning_rate', 0.0005, 'The initial learning rate for training.') #0.0005
+    'learning_rate', 0.005, 'The initial learning rate for training.') #0.0005
 
 tf.app.flags.DEFINE_integer(
     'decay_steps', 10000, 'The learning rate decay steps for training.')
@@ -65,8 +65,8 @@ FLAGS = tf.app.flags.FLAGS
 
 gpus = list(range(len(FLAGS.gpu_list.split(','))))
 
-characters = keys.alphabet[:]
-characters = characters[1:] + u'卍'
+characters = keys.alphabet_CN[:]
+characters = characters[0:] + u'卍'
 nclass = len(characters)
 char_map_dict = {}
 for i, val in enumerate(characters):
@@ -87,7 +87,7 @@ def _sparse_matrix_to_list(sparse_matrix, char_map_dict=None):
     # the last index in sparse_matrix is ctc blanck note
     if char_map_dict is None:
         char_map_dict = json.load(open(FLAGS.char_map_json_file, 'r'))
-    assert(isinstance(char_map_dict, dict) and 'char_map_dict is not a dict')    
+    assert(isinstance(char_map_dict, dict) and 'char_map_dict is not a dict')
 
     dense_matrix =  len(char_map_dict.keys()) * np.ones(dense_shape, dtype=np.int32)
     for i, indice in enumerate(indices):
@@ -214,10 +214,10 @@ def tower_loss(input_images, input_labels, input_labels_dense, input_labels_leng
 
 def _train_densenetocr_ctc():
     # tfrecord_path = [os.path.join(FLAGS.data_dir, 'train20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'train32_768_20190707.tfrecord'), os.path.join(FLAGS.data_dir, 'train.tfrecord'), os.path.join(FLAGS.data_dir, 'train_02.tfrecord'), os.path.join(FLAGS.data_dir, 'validation.tfrecord')]
-    tfrecord_path = ['/datacentre/wuyang.zhang/300w_tfrecords_32_512_sin_blur_20190703/train.tfrecord']
-    tfrecord_path.append(os.path.join(FLAGS.data_dir, 'train.tfrecord'))
-    tfrecord_path.append('/datacentre/wuyang.zhang/real_tfrecords_20190712/train_32_280_20190712.tfrecord')
-    tfrecord_path.append('/datacentre/wuyang.zhang/real_imgs_tfrecord_32_280_512_20190704/train_real_32_280_512.tfrecord')
+    # tfrecord_path = ['/datacentre/wuyang.zhang/medicine_32_280_tfrecords/train_32_280_20190722.tfrecord']
+    tfrecord_path = [os.path.join(FLAGS.data_dir, 'train_32_real_20190917.tfrecord')]
+    # tfrecord_path.append('/datacentre/wuyang.zhang/real_tfrecords_20190712/train_32_280_20190712.tfrecord')
+    # tfrecord_path.append('/datacentre/wuyang.zhang/real_imgs_tfrecord_32_280_512_20190704/train_real_32_280_512.tfrecord')
 
     tfrecord_reader = TFRecord_Reader(tfrecord_path, batch_size=FLAGS.batch_size)
     batch_images, batch_labels, batch_labels_dense, batch_input_labels_lengths, batch_sequence_lengths, _ = tfrecord_reader.read_and_decode()

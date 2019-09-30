@@ -37,7 +37,7 @@ from tensorflow.contrib.lite.python import lite_constants
 # in 1.13.1
 # from tensorflow.lite.python import lite_constants
 
-from utils.external.densenetctc_tensorflow import model
+# from utils.external.densenetctc_tensorflow import model
 
 # common configurations
 tf.app.flags.DEFINE_string('log_dir', '/tmp/workspace/PocketFlow/logs', 'logging directory')

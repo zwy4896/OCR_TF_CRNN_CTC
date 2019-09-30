@@ -14,15 +14,15 @@ slim = tf.contrib.slim
 import numpy as np
 
 from nets import densenet
-import keys
-#import warpctc_tensorflow
+import keys_old as keys
+import warpctc_tensorflow
 from tfrecord import TFRecord_Reader
 
 #os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 # ------------------------------------Basic prameters------------------------------------
 tf.app.flags.DEFINE_string(
-    'data_dir', '/tmp/densenet_ctc_tfrecords/', 'Path to the directory containing data tf record.')
+    'data_dir', '/algdata01/wuyang.zhang/300w_tfrecords_32_512_sin_blur_20190703', 'Path to the directory containing data tf record.')
 
 tf.app.flags.DEFINE_boolean('restore', False, 'whether to resotre from checkpoint')   
 
@@ -40,7 +40,7 @@ tf.app.flags.DEFINE_integer(
 
 # ------------------------------------Basic prameters------------------------------------
 tf.app.flags.DEFINE_integer(
-    'batch_size', 2, 'The number of samples in each batch.')
+    'batch_size', 32, 'The number of samples in each batch.')
 
 tf.app.flags.DEFINE_integer(
     'max_train_steps', 20000, 'The number of maximum iteration steps for training')
@@ -102,12 +102,12 @@ def _int_to_string(value, char_map_dict=None):
     '''
 
 def _train_densenetocr_ctc():
-    tfrecord_path = os.path.join(FLAGS.data_dir, 'train.tfrecord')
+    tfrecord_path = os.path.join(FLAGS.data_dir, 'trainreal_32_20190723.tfrecord')
 
     tfrecord_reader = TFRecord_Reader([tfrecord_path], batch_size=FLAGS.batch_size)
     batch_images, batch_labels, batch_labels_dense, batch_input_labels_lengths, batch_sequence_lengths, _ = tfrecord_reader.read_and_decode()
 
-    input_images = tf.placeholder(tf.float32, shape=[FLAGS.batch_size, 32, None, 3], name='input_images')
+    input_images = tf.placeholder(tf.float32, shape=[FLAGS.batch_size, 32, None, 1], name='input_images')
     input_labels = tf.sparse_placeholder(tf.int32, name='input_labels')
     input_labels_dense = tf.placeholder(tf.int32, shape=[FLAGS.batch_size, None], name='input_labels_dense')
     input_labels_lengths = tf.placeholder(dtype=tf.int32, shape=[FLAGS.batch_size], name='input_labels_lengths')
@@ -120,13 +120,13 @@ def _train_densenetocr_ctc():
             first_output_features = 64
             layers_per_block = 8
             growth_rate = 8
-            net, _ = densenet.densenet_40(input_images, 5990, first_output_features, layers_per_block, growth_rate, is_training = True)
+            net, _ = densenet.densenet_40(input_images, nclass, first_output_features, layers_per_block, growth_rate, is_training = True)
 
-    ctc_loss = tf.reduce_mean(
-        tf.nn.ctc_loss(labels=input_labels, inputs=net, sequence_length=input_sequence_lengths,
-            ignore_longer_outputs_than_inputs=True))
-    #ctc_loss = tf.reduce_mean(warpctc_tensorflow.ctc(net, tf.reshape(input_labels_dense, [-1]), \
-    #    tf.reshape(input_labels_lengths, [-1]), tf.reshape(input_sequence_lengths, [-1])))
+    # ctc_loss = tf.reduce_mean(
+    #     tf.nn.ctc_loss(labels=input_labels, inputs=net, sequence_length=input_sequence_lengths,
+    #         ignore_longer_outputs_than_inputs=True))
+    ctc_loss = tf.reduce_mean(warpctc_tensorflow.ctc(net, tf.reshape(batch_labels_dense, [-1]), 
+                tf.reshape(batch_input_labels_lengths, [-1]), tf.reshape(batch_sequence_lengths, [-1])))
 
     #ctc_decoded, ct_log_prob = tf.nn.ctc_beam_search_decoder(net, input_sequence_lengths, merge_repeated=False)
     ctc_decoded, ct_log_prob = tf.nn.ctc_greedy_decoder(net, input_sequence_lengths, merge_repeated=False)
@@ -139,8 +139,8 @@ def _train_densenetocr_ctc():
 
     update_ops = tf.group(*tf.get_collection(tf.GraphKeys.UPDATE_OPS))
     #optimizer = tf.train.AdadeltaOptimizer(learning_rate=learning_rate).minimize(loss=ctc_loss, global_step=global_step)
-    # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=ctc_loss, global_step=global_step)
-    optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(loss=ctc_loss, global_step=global_step)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss=ctc_loss, global_step=global_step)
+    # optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9).minimize(loss=ctc_loss, global_step=global_step)
     # save moving average
     variable_averages = tf.train.ExponentialMovingAverage(
         FLAGS.moving_average_decay, global_step)

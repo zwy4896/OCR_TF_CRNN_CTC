@@ -1,0 +1,10 @@
+densenet*/
+MobileNetV2*/
+model*/
+OCR_TF_CRNN_CTC_ckpt_201907010/
+test*/
+train_tfrecord_32/
+mnv2_densenet_tfrecord/
+*.out
+*.txt
+*.jpg

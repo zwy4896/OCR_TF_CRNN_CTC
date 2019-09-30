@@ -72,7 +72,7 @@ def get_labels():
             # hehe测试集，以'卍'符号分割
             labels[os.path.join(FLAGS.image_dir, line.split('卍')[0])]= line.split('卍')[1]
             # 普通测试集，以空格分隔
-            # labels[os.path.join(FLAGS.image_dir, line.split()[0])]= line.split()[1]
+            # labels[os.path.join(FLAGS.image_dir, line.split('$$$')[0])]= line.split('$$$')[1]
 
     return labels
 

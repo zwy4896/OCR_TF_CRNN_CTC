@@ -1,0 +1,1 @@
+alphabet = '  \'\",.;:<>?/[]\|+=-_~`!@#$%^&*()1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'

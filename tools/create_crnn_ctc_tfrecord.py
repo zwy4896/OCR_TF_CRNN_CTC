@@ -15,7 +15,8 @@ import tensorflow as tf
 
 import cv2
 import numpy as np
-import keys_old as keys
+import keys
+# import keys_de as keys
 #sys.path.append(os.getcwd()+'/tools')
 
 _IMAGE_HEIGHT = 32
@@ -41,9 +42,11 @@ tf.app.flags.DEFINE_string(
 
 FLAGS = tf.app.flags.FLAGS
 
-characters = keys.alphabet[:]
-characters = characters[1:] + u'卍'
+characters = keys.alphabet_JPN[:]
+# print(characters)
+characters = characters[0:] + u'卍'
 nclass = len(characters)
+# print(nclass)
 char_map_dict = {}
 for i, val in enumerate(characters):
     char_map_dict[val] = i
@@ -77,15 +80,19 @@ def parse_synth_label(line):
 # 解析textrender的格式, 文件名(不含后缀) 文本内容
 def parse_textrender_label(line):
     line = line.strip()
-    image_name = line.split()[0]
-    label = line.split()[1].lower()
+    image_name = line.split('$$$')[0]
+    # image_name = line.split(' ')[0]
+
+    label = line.split('$$$')[1].strip()
+    # label = line.split(' ')[1].lower()
+
     return image_name, label
 
 def _write_tfrecord(dataset_split, anno_lines):
     if not os.path.exists(FLAGS.data_dir):
         os.makedirs(FLAGS.data_dir)
 
-    tfrecords_path = os.path.join(FLAGS.data_dir, dataset_split + '_32_280_20190712' + '.tfrecord')
+    tfrecords_path = os.path.join(FLAGS.data_dir, dataset_split + '_32_real_20190918' + '.tfrecord')
     with tf.python_io.TFRecordWriter(tfrecords_path) as writer:
         for i, line in enumerate(anno_lines):
             line = line.strip()
@@ -99,28 +106,29 @@ def _write_tfrecord(dataset_split, anno_lines):
             #image = cv2.resize(image, _IMAGE_SIZE)
 
             h, w, c = image.shape
-            height = _IMAGE_HEIGHT
-            width = int(w * height / h)
-            image = cv2.resize(image, (width, height))
-            new_width = width
-            new_image = np.zeros((32, new_width, 3))
-            new_image[:,0:width, :] = image
-            is_success, image_buffer = cv2.imencode('.jpg', new_image)
-            if not is_success:
-                continue
+            if w > h:
+                height = _IMAGE_HEIGHT
+                width = int(w * height / h)
+                image = cv2.resize(image, (width, height))
+                new_width = width
+                new_image = np.zeros((32, new_width, 3))
+                new_image[:,0:width, :] = image
+                is_success, image_buffer = cv2.imencode('.jpg', new_image)
+                if not is_success:
+                    continue
 
-            # convert string object to bytes in py3
-            image_name = image_name if sys.version_info[0] < 3 else image_name.encode('utf-8') 
-            
-            features = tf.train.Features(feature={
-               'labels': _int64_feature(_string_to_int(label)),
-               'images': _bytes_feature(image_buffer.tostring()),
-               'imagenames': _bytes_feature(image_name)
-            })
-            example = tf.train.Example(features=features)
-            writer.write(example.SerializeToString())
-            sys.stdout.write('\r>>Writing to {:s}.tfrecords {:d}/{:d}'.format(dataset_split, i + 1, len(anno_lines)))
-            sys.stdout.flush()
+                # convert string object to bytes in py3
+                image_name = image_name if sys.version_info[0] < 3 else image_name.encode('utf-8') 
+
+                features = tf.train.Features(feature={
+                   'labels': _int64_feature(_string_to_int(label)),
+                   'images': _bytes_feature(image_buffer.tostring()),
+                   'imagenames': _bytes_feature(image_name)
+                })
+                example = tf.train.Example(features=features)
+                writer.write(example.SerializeToString())
+                sys.stdout.write('\r>>Writing to {:s}.tfrecords {:d}/{:d}'.format(dataset_split, i + 1, len(anno_lines)))
+                sys.stdout.flush()
         sys.stdout.write('\n')
         sys.stdout.write('>> {:s}.tfrecords write finish.'.format(dataset_split))
         sys.stdout.flush()

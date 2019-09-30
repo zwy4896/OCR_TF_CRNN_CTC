@@ -61,7 +61,7 @@ def get_meta_path():
   * file_path: path to the *.meta file
   """
 
-  pattern = re.compile(r'crnn_ctc_ocr_2019-07-03-15-51-26\.ckpt-44999\.meta$')  # file name must be: *model.ckpt.meta
+  pattern = re.compile(r'crnn_ctc_ocr_2019-09-24-18-34-10\.ckpt-149999\.meta$')  # file name must be: *model.ckpt.meta
   for file_name in os.listdir(FLAGS.model_dir):
     if re.search(pattern, file_name) is not None:
       file_path = os.path.join(FLAGS.model_dir, file_name)

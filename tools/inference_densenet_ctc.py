@@ -23,7 +23,7 @@ from nets.cnn.dense_net import DenseNet
 from nets.cnn.mobile_net_v2 import MobileNetV2
 
 # keys有变化
-import keys_old as keys
+import keys
 # import keys
 
 os.environ["CUDA_VISIBLE_DEVICES"]=""
@@ -38,8 +38,8 @@ tf.app.flags.DEFINE_string(
 
 FLAGS = tf.app.flags.FLAGS
 
-characters = keys.alphabet[:]
-characters = characters[1:] + u'卍'
+characters = keys.alphabet_CN[:]
+characters = characters[0:] + u'卍'
 nclass = len(characters)
 char_map_dict = {}
 for i, val in enumerate(characters):
@@ -72,7 +72,7 @@ def get_labels():
             # hehe测试集，以'卍'符号分割
             labels[os.path.join(FLAGS.image_dir, line.split('卍')[0])]= line.split('卍')[1]
             # 普通测试集，以空格分隔
-            # labels[os.path.join(FLAGS.image_dir, line.split()[0])]= line.split()[1]
+            # labels[os.path.join(FLAGS.image_dir, line.split('$$$')[0])]= line.split('$$$')[1]
 
     return labels
 
@@ -190,11 +190,8 @@ def _inference_densenet_ctc():
         logits = bilstm
         '''
 
-        logits = slim.fully_connected(cnn_out_reshaped, 5990, activation_fn=None)
-        # logits = slim.fully_connected(cnn_out_reshaped, 6049, activation_fn=None)
+        logits = slim.fully_connected(cnn_out_reshaped, nclass, activation_fn=None)
         # logits = tf.layers.dense(cnn_out_reshaped, 5990)
-
-
 
         # ctc require time major
         logits = tf.transpose(logits, (1, 0, 2))
@@ -204,11 +201,12 @@ def _inference_densenet_ctc():
     ctc_decoded, ctc_log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len, merge_repeated=True)
 
     image_names = get_images()
-    gt_labels = get_labels()
+    # gt_labels = get_labels()
 
     # set checkpoint saver
     saver = tf.train.Saver()
     save_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+    # print(save_path)
 
     with tf.Session() as sess:
         # restore all variables
@@ -227,7 +225,7 @@ def _inference_densenet_ctc():
             width = int(w * height / h)
             # print(height, width)
             if width > height:
-                print('ok')
+                # print('ok')
                 image = cv2.resize(image, (width, height))[:,:,::-1]
                 image = Image.fromarray(image).convert('L')
                 new_image = np.zeros((32, width))
@@ -246,29 +244,29 @@ def _inference_densenet_ctc():
                 print('Predict {:s} image as: {:s}'.format(image_name, preds[0]))
 
                 pred = preds[0]
-                gt_label = gt_labels[image_name]
-                pred = re.sub("[\s+\.\!\/_,$%^*(+\"\']+|[+——！〔!，。《》；;'‘’<>【】/?？、·°""“”~@#：④|:￥%……&*()（）]+", "",pred)
-                gt_label = re.sub("[\s+\.\!\/_,$%^*(+\"\']+|[+——！〔!，。《》；;'‘’<>【】/?？、·°""“”~@#：④|:￥%……&*()（）]+", "",gt_label)
-                total_count = len(gt_label)
-                correct_count = 0
-                # with open('result_heng_test.txt', 'a+', encoding='utf-8') as f:
-                #     f.write(image_name.split('/')[-1] + '卍' + pred + '\n')
-                try:
-                    for i, tmp in enumerate(gt_label):
-                        if tmp == pred[i]:
-                            correct_count += 1
-                except IndexError:
-                    continue
-                finally:
-                    try:
-                        accuracy.append(correct_count / total_count)
-                    except ZeroDivisionError:
-                        if len(pred) == 0:
-                            accuracy.append(1)
-                        else:
-                            accuracy.append(0)
-        accuracy = np.mean(np.array(accuracy).astype(np.float32), axis=0)
-        print('accuracy={:9f}'.format(accuracy))
+                # gt_label = gt_labels[image_name]
+                # pred = re.sub("[\s+\.\!\/_,$%^*(+\"\']+|[+——！〔!，。《》；;'‘’<>【】/?？、·°""“”~@#：④|:￥%……&*()（）]+", "",pred)
+                # gt_label = re.sub("[\s+\.\!\/_,$%^*(+\"\']+|[+——！〔!，。《》；;'‘’<>【】/?？、·°""“”~@#：④|:￥%……&*()（）]+", "",gt_label)
+        #         total_count = len(gt_label)
+        #         correct_count = 0
+        #         # with open('result_B5_0728.txt', 'a+', encoding='utf-8') as f:
+        #         #     f.write(image_name.split('/')[-1] + '卍' + pred + '\n')
+        #         try:
+        #             for i, tmp in enumerate(gt_label):
+        #                 if tmp == pred[i]:
+        #                     correct_count += 1
+        #         except IndexError:
+        #             continue
+        #         finally:
+        #             try:
+        #                 accuracy.append(correct_count / total_count)
+        #             except ZeroDivisionError:
+        #                 if len(pred) == 0:
+        #                     accuracy.append(1)
+        #                 else:
+        #                     accuracy.append(0)
+        # accuracy = np.mean(np.array(accuracy).astype(np.float32), axis=0)
+        # print('accuracy={:9f}'.format(accuracy))
 
         
 def main(unused_argv):
